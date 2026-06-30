@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R Smart TV</title>
+    
+    <link href="https://vjs.zencdn.net/8.6.1/video-js.css" rel="stylesheet" />
+    
+    <style>
+        :root {
+            --bg-color: #0f0f13;
+            --panel-bg: #1c1c23;
+            --focus-color: #ffcc00;
+            --text-color: #ffffff;
+            --active-cat: #e63946;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden; 
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            font-size: 22px;
+            font-weight: bold;
+            padding: 10px;
+            background-color: #0a0a0c;
+            border-bottom: 1px solid #333;
+        }
+
+        /* টেলিগ্রাম বাটন স্টাইল */
+        .telegram-btn {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 35px;
+            height: 35px;
+            background-color: #0088cc;
+            border-radius: 50%;
+            text-decoration: none;
+            border: 2px solid transparent;
+            transition: transform 0.2s;
+        }
+
+        .telegram-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+            margin-right: 2px;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            padding: 15px;
+            gap: 20px;
+            height: calc(100vh - 60px);
+            box-sizing: border-box;
+        }
+
+        /* চ্যানেল লিস্ট */
+        .sidebar {
+            width: 28%;
+            background-color: var(--panel-bg);
+            border-radius: 10px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow-y: auto;
+        }
+
+        .sidebar-title {
+            font-size: 18px;
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #444;
+            margin-bottom: 5px;
+            color: #ccc;
+        }
+
+        .channel-item {
+            padding: 12px;
+            background-color: #2a2a35;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .channel-item img {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            background-color: #fff;
+            border-radius: 4px;
+        }
+
+        .channel-item span {
+            font-size: 15px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ডান পাশের অংশ */
+        .content {
+            width: 72%;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* Video.js প্লেয়ার সেকশন */
+        .player-wrapper {
+            flex: 2;
+            background-color: #000;
+            border-radius: 10px;
+            position: relative;
+            border: 4px solid transparent;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+
+        .player-wrapper:fullscreen {
+            border: none;
+            border-radius: 0;
+            background-color: #000;
+        }
+
+        .video-js {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* =========================================
+           Ratio Menu (ভিডিও সাইজ / জুম কন্ট্রোল)
+           ========================================= */
+        .ratio-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 45px;
+            height: 45px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 8px;
+            border: 2px solid transparent;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 105;
+            opacity: 0; /* সাধারণ অবস্থায় হাইড থাকবে */
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        /* ফুলস্ক্রিনে বা প্লেয়ার ফোকাস থাকলে Ratio বাটন দেখাবে */
+        .player-wrapper:fullscreen .ratio-btn.show, 
+        .player-wrapper:fullscreen .ratio-btn:focus {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .ratio-btn svg {
+            width: 26px;
+            height: 26px;
+        }
+
+        /* =========================================
+           কাস্টম OSD (সব জায়গায় কাজ করবে)
+           ========================================= */
+        .tv-bottom-osd {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(30, 30, 35, 0.95);
+            border-top: 3px solid #ff7b00;
+            padding: 15px 25px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: none;
+        }
+
+        .tv-bottom-osd.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .osd-top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .osd-info-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .osd-logo {
+            width: 60px;
+            height: 60px;
+            background: #fff;
+            border-radius: 5px;
+            object-fit: contain;
+            padding: 2px;
+        }
+
+        .osd-text-info h2 {
+            margin: 0 0 5px 0;
+            font-size: 22px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .osd-text-info p {
+            margin: 2px 0;
+            font-size: 14px;
+            color: #ffcc00;
+        }
+
+        .osd-text-info p.next-prog {
+            color: #aaa;
+        }
+
+        .osd-time {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffcc00;
+        }
+
+        .osd-bottom-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 5px;
+        }
+
+        .osd-play-btn {
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .osd-progress-bar {
+            flex: 1;
+            height: 4px;
+            background: #555;
+            border-radius: 2px;
+            position: relative;
+        }
+
+        .osd-progress-fill {
+            width: 40%;
+            height: 100%;
+            background: #ffcc00;
+            border-radius: 2px;
+        }
+
+        .osd-icons {
+            display: flex;
+            gap: 15px;
+            font-size: 20px;
+        }
+
+        /* ক্যাটাগরি সেকশন */
+        .categories {
+            height: 120px;
+            background-color: var(--panel-bg);
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .cat-title {
+            font-size: 16px;
+            color: #ccc;
+            margin-bottom: 10px;
+        }
+
+        .cat-grid {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+        }
+
+        .cat-btn {
+            padding: 10px 20px;
+            background-color: #333344;
+            border: 3px solid transparent;
+            border-radius: 8px;
+            font-size: 15px;
+            color: white;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        
+        .cat-btn.active {
+            background-color: var(--active-cat);
+        }
+
+        /* ফোকাস স্টাইল */
+        .focusable:focus, .focused {
+            outline: none;
+            border-color: var(--focus-color) !important;
+            transform: scale(1.03);
+            background-color: #444455;
+            box-shadow: 0 0 12px rgba(255, 204, 0, 0.6);
+            z-index: 10;
+        }
+
+        .telegram-btn:focus {
+            box-shadow: 0 0 15px #0088cc;
+            transform: scale(1.1);
+            border-color: white !important;
+        }
+
+        .ratio-btn:focus {
+            background: rgba(255, 204, 0, 0.3);
+            border-color: var(--focus-color) !important;
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <span>R Smart TV</span>
+        <a href="https://t.me/rrplex" target="_blank" class="telegram-btn focusable" tabindex="0" title="Join Telegram">
+            <svg viewBox="0 0 24 24">
+                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+            </svg>
+        </a>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="sidebar-title" id="cat-display-title">Loading...</div>
+            <div id="channel-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+
+        <div class="content">
+            <div class="player-wrapper focusable" id="tv-player-wrapper" tabindex="0">
+                
+                <video id="tv-video" class="video-js vjs-default-skin" controls preload="auto"></video>
+                
+                <div class="ratio-btn focusable" id="ratio-btn" tabindex="0">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <polyline points="8 8 10 8 10 10"></polyline>
+                        <polyline points="16 16 14 16 14 14"></polyline>
+                    </svg>
+                </div>
+
+                <div class="tv-bottom-osd" id="tv-osd">
+                    <div class="osd-top-row">
+                        <div class="osd-info-group">
+                            <img src="" id="osd-logo" class="osd-logo" alt="Logo">
+                            <div class="osd-text-info">
+                                <h2 id="osd-channel-name">Channel Name</h2>
+                                <p id="osd-ratio-text">Ratio: Normal</p>
+                                <p class="next-prog">No data (Next)</p>
+                            </div>
+                        </div>
+                        <div class="osd-time" id="osd-time">12:00 PM</div>
+                    </div>
+                    
+                    <div class="osd-bottom-row">
+                        <div class="osd-play-btn" id="osd-play-pause">⏸</div>
+                        <div class="osd-progress-bar">
+                            <div class="osd-progress-fill"></div>
+                        </div>
+                        <div class="osd-icons">
+                            <span>📅</span>
+                            <span>ℹ️</span>
+                            <span>❤️</span>
+                            <span>•••</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="categories">
+                <div class="cat-title">প্লেলিস্ট ক্যাটাগরি</div>
+                <div class="cat-grid" id="category-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://vjs.zencdn.net/8.6.1/video.min.js"></script>
+
+    <script>
+        const M3U_URL = "https://raw.githubusercontent.com/Raisanbd/moive-rplex/refs/heads/main/rsmart.m3u";
+        
+        let allChannels = [];
+        let categories = [];
+        let currentCategory = "All Channels";
+        let currentChannelIndex = 0;
+        let filteredChannels = [];
+        let isFirstLoad = true;
+        
+        // Video.js ইনিশিয়ালাইজেশন
+        let player = videojs('tv-video', { 
+            autoplay: true, 
+            controls: false, // ডিফল্ট কন্ট্রোল বন্ধ, কারণ আমাদের নিজস্ব OSD আছে
+            fluid: false 
+        });
+
+        const channelListDiv = document.getElementById('channel-list');
+        const categoryListDiv = document.getElementById('category-list');
+        const catDisplayTitle = document.getElementById('cat-display-title');
+        
+        const playerWrapper = document.getElementById('tv-player-wrapper');
+        const tvOsd = document.getElementById('tv-osd');
+        const ratioBtn = document.getElementById('ratio-btn');
+        const osdLogo = document.getElementById('osd-logo');
+        const osdChannelName = document.getElementById('osd-channel-name');
+        const osdRatioText = document.getElementById('osd-ratio-text');
+        const osdTime = document.getElementById('osd-time');
+        const osdPlayPause = document.getElementById('osd-play-pause');
+        
+        let osdTimeout;
+
+        // Aspect Ratio লজিক
+        const ratioModes = ['contain', 'cover', 'fill'];
+        const ratioNames = ['Normal', 'Zoom (Cover)', 'Stretch (Fill)'];
+        let currentRatioIndex = 0;
+
+        function toggleAspectRatio() {
+            currentRatioIndex = (currentRatioIndex + 1) % ratioModes.length;
+            const videoTag = document.querySelector('#tv-video_html5_api');
+            if(videoTag) {
+                videoTag.style.objectFit = ratioModes[currentRatioIndex];
+            }
+            osdRatioText.innerText = "Ratio: " + ratioNames[currentRatioIndex];
+            showOSD(filteredChannels[currentChannelIndex], !player.paused());
+        }
+
+        function updateTime() {
+            const now = new Date();
+            let hours = now.getHours();
+            let minutes = now.getMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; 
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            osdTime.innerText = hours + ':' + minutes + ' ' + ampm;
+        }
+
+        // OSD কন্ট্রোল
+        function showOSD(channel, isPlaying) {
+            updateTime();
+            if(channel) {
+                osdLogo.src = channel.logo || "https://via.placeholder.com/60x60?text=TV";
+                osdChannelName.innerText = channel.name;
+            }
+            osdPlayPause.innerText = isPlaying ? "⏸" : "▶";
+            
+            tvOsd.classList.add('show');
+            ratioBtn.classList.add('show');
+
+            clearTimeout(osdTimeout);
+            osdTimeout = setTimeout(() => {
+                tvOsd.classList.remove('show');
+                ratioBtn.classList.remove('show');
+                // যদি ratio-btn এ ফোকাস থাকে, তাহলে টাইমআউট হলে ফোকাস সরিয়ে প্লেয়ারে নিয়ে যাওয়া
+                if (document.activeElement === ratioBtn) {
+                    playerWrapper.focus();
+                }
+            }, 5000); // ৫ সেকেন্ড পর চলে যাবে
+        }
+
+        async function loadPlaylist() {
+            try {
+                const response = await fetch(M3U_URL);
+                const text = await response.text();
+                parseM3U(text);
+            } catch (error) {
+                console.error("Error:", error);
+                catDisplayTitle.innerText = "Error Loading Playlist";
+            }
+        }
+
+        function parseM3U(data) {
+            const lines = data.split('\n');
+            let currentChannel = {};
+            let tempCategories = new Set();
+            allChannels = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                if (line.startsWith('#EXTINF:')) {
+                    const groupMatch = line.match(/group-title="([^"]+)"/);
+                    currentChannel.category = groupMatch ? groupMatch[1] : "Others";
+                    tempCategories.add(currentChannel.category);
+
+                    const logoMatch = line.match(/tvg-logo="([^"]+)"/);
+                    currentChannel.logo = logoMatch ? logoMatch[1] : "";
+
+                    const nameParts = line.split(',');
+                    currentChannel.name = nameParts.length > 1 ? nameParts[1].trim() : "Unknown Channel";
+                } else if (line !== '' && !line.startsWith('#')) {
+                    currentChannel.url = line;
+                    allChannels.push({...currentChannel});
+                    currentChannel = {}; 
+                }
+            }
+
+            categories = ["All Channels", ...Array.from(tempCategories)];
+            if (allChannels.length > 0) {
+                renderCategories();
+                selectCategory("All Channels"); 
+            }
+        }
+
+        function renderCategories() {
+            categoryListDiv.innerHTML = "";
+            categories.forEach(cat => {
+                const btn = document.createElement('div');
+                btn.className = 'cat-btn focusable';
+                btn.tabIndex = 0;
+                btn.innerText = cat;
+                btn.onclick = () => selectCategory(cat);
+                categoryListDiv.appendChild(btn);
+            });
+        }
+
+        function selectCategory(categoryName) {
+            currentCategory = categoryName;
+            catDisplayTitle.innerText = categoryName;
+            
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if(btn.innerText === categoryName) btn.classList.add('active');
+            });
+
+            if (categoryName === "All Channels") {
+                filteredChannels = [...allChannels];
+            } else {
+                filteredChannels = allChannels.filter(ch => ch.category === categoryName);
+            }
+            renderChannels();
+        }
+
+        function renderChannels() {
+            channelListDiv.innerHTML = "";
+            filteredChannels.forEach((ch, index) => {
+                const div = document.createElement('div');
+                div.className = 'channel-item focusable';
+                div.tabIndex = 0;
+                let imgTag = ch.logo ? `<img src="${ch.logo}" alt="logo">` : `<img src="https://via.placeholder.com/40x40?text=TV" alt="logo">`;
+                div.innerHTML = `${imgTag} <span>${ch.name}</span>`;
+                div.onclick = () => playChannel(index);
+                channelListDiv.appendChild(div);
+            });
+            updateFocusables();
+            
+            if(filteredChannels.length > 0) {
+                playChannel(0);
+                if(isFirstLoad) {
+                    setTimeout(() => {
+                        const firstItem = document.querySelector('.channel-item');
+                        if(firstItem) firstItem.focus();
+                    }, 300);
+                    isFirstLoad = false;
+                }
+            }
+        }
+
+        function playChannel(index) {
+            if(filteredChannels.length === 0) return;
+            currentChannelIndex = index;
+            const channel = filteredChannels[index];
+            
+            let type = "application/x-mpegURL"; 
+            if(channel.url.endsWith('.mp4')) type = "application/x-mpegURL"; // HLS fallback
+            
+            player.src({ src: channel.url, type: type });
+            player.play();
+
+            showOSD(channel, true);
+        }
+
+        // ==========================================
+        // রিমোট স্পেশিয়াল নেভিগেশন ও ফুলস্ক্রিন লজিক
+        // ==========================================
+        let focusables = [];
+        function updateFocusables() {
+            focusables = Array.from(document.querySelectorAll('.focusable'));
+        }
+
+        document.addEventListener('keydown', function(e) {
+            const currentFocus = document.activeElement;
+            const isFullscreen = document.fullscreenElement !== null;
+
+            if (isFullscreen && (e.key === 'Escape' || e.key === 'Backspace')) {
+                document.exitFullscreen();
+                e.preventDefault();
+                return;
+            }
+
+            // ================= Fullscreen Navigation =================
+            if (isFullscreen) {
+                // ১. যদি রেশিও বাটনে ফোকাস থাকে
+                if (currentFocus.id === 'ratio-btn') {
+                    if (e.key === 'Enter') {
+                        toggleAspectRatio();
+                        e.preventDefault();
+                    } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+                        playerWrapper.focus(); // ফোকাস প্লেয়ারে ফেরত আনবে
+                        e.preventDefault();
+                    }
+                    return;
+                }
+                
+                // ২. যদি মূল প্লেয়ার ফুলস্ক্রিনে থাকে
+                if (e.key === 'ArrowUp') {
+                    showOSD(filteredChannels[currentChannelIndex], !player.paused());
+                    ratioBtn.focus(); // উপরের কোণায় রেশিও বাটনে ফোকাস যাবে
+                    e.preventDefault();
+                    return;
+                }
+                if (e.key === 'ArrowRight') {
+                    let nextIdx = (currentChannelIndex + 1) % filteredChannels.length;
+                    playChannel(nextIdx);
+                    e.preventDefault();
+                    return;
+                }
+                if (e.key === 'ArrowLeft') {
+                    let prevIdx = (currentChannelIndex - 1 + filteredChannels.length) % filteredChannels.length;
+                    playChannel(prevIdx);
+                    e.preventDefault();
+                    return;
+                }
+                if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                    if(e.key === 'Enter') {
+                        if (player.paused()) player.play();
+                        else player.pause();
+                    }
+                    showOSD(filteredChannels[currentChannelIndex], !player.paused());
+                    e.preventDefault();
+                    return;
+                }
+            }
+
+            // ================= Normal Screen Navigation =================
+            if (!isFullscreen && currentFocus) {
+                
+                if (e.key === 'ArrowRight' && currentFocus.classList.contains('channel-item')) {
+                    playerWrapper.focus();
+                    e.preventDefault();
+                    return;
+                }
+                
+                if (e.key === 'ArrowDown' && currentFocus.id === 'tv-player-wrapper') {
+                    const activeCat = document.querySelector('.cat-btn.active') || document.querySelector('.cat-btn');
+                    if (activeCat) activeCat.focus();
+                    e.preventDefault();
+                    return;
+                }
+                
+                if (e.key === 'ArrowLeft' && currentFocus.id === 'tv-player-wrapper') {
+                    const channels = document.querySelectorAll('.channel-item');
+                    if (channels.length > currentChannelIndex) channels[currentChannelIndex].focus();
+                    else if (channels.length > 0) channels[0].focus();
+                    e.preventDefault();
+                    return;
+                }
+                
+                if (e.key === 'ArrowUp' && currentFocus.classList.contains('cat-btn')) {
+                    playerWrapper.focus();
+                    e.preventDefault();
+                    return;
+                }
+
+                let nextTarget = null;
+                const rect = currentFocus.getBoundingClientRect();
+
+                if (e.key === 'ArrowDown') nextTarget = findNextElement(rect, 0, 1);
+                else if (e.key === 'ArrowUp') nextTarget = findNextElement(rect, 0, -1);
+                else if (e.key === 'ArrowRight') nextTarget = findNextElement(rect, 1, 0);
+                else if (e.key === 'ArrowLeft') nextTarget = findNextElement(rect, -1, 0);
+                else if (e.key === 'Enter') {
+                    if(currentFocus.id === 'tv-player-wrapper') {
+                        // Video.js এর ডিফল্ট ফুলস্ক্রিন এর বদলে আমরা Wrapper টাকে ফুলস্ক্রিন করছি 
+                        // যাতে OSD এবং Ratio বাটন সাথে থাকে
+                        playerWrapper.requestFullscreen().catch(err => console.log(err));
+                        showOSD(filteredChannels[currentChannelIndex], !player.paused());
+                    } else {
+                        currentFocus.click();
+                    }
+                }
+
+                if (nextTarget) {
+                    nextTarget.focus();
+                    nextTarget.scrollIntoView({ behavior: "smooth", block: "center" });
+                    e.preventDefault();
+                }
+            }
+        });
+
+        function findNextElement(currentRect, dirX, dirY) {
+            let bestMatch = null;
+            let minDistance = Number.MAX_VALUE;
+
+            focusables.forEach(el => {
+                if (el === document.activeElement) return;
+                const targetRect = el.getBoundingClientRect();
+                let isCorrectDirection = false;
+                
+                if (dirX === 1 && targetRect.left >= currentRect.right - 15) isCorrectDirection = true;
+                if (dirX === -1 && targetRect.right <= currentRect.left + 15) isCorrectDirection = true;
+                if (dirY === 1 && targetRect.top >= currentRect.bottom - 15) isCorrectDirection = true;
+                if (dirY === -1 && targetRect.bottom <= currentRect.top + 15) isCorrectDirection = true;
+
+                if (isCorrectDirection) {
+                    const dx = targetRect.x - currentRect.x;
+                    const dy = targetRect.y - currentRect.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        bestMatch = el;
+                    }
+                }
+            });
+            return bestMatch;
+        }
+
+        window.onload = () => {
+            loadPlaylist();
+        };
+
+    </script>
+</body>
+</html>
